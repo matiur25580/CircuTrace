@@ -86,7 +86,7 @@ export async function createProduct(input: {
   customAttributes: Record<string, unknown>;
 }, organizationId: mongoose.Types.ObjectId, actorUserId: mongoose.Types.ObjectId, requestId?: string) {
   const category = await ProductCategory.findOne({ _id: input.categoryId, organizationId }).lean();
-  if (!category) fail('Product category was not found in this organization.', 404);
+  if (!category) return fail('Product category was not found in this organization.', 404);
   validateCustomAttributes(category.metadataFields as MetadataField[], input.customAttributes);
   if (input.sku && await Product.exists({ organizationId, sku: input.sku.toUpperCase() })) fail('SKU already exists in this organization.', 409);
   if (input.gtin && await Product.exists({ organizationId, gtin: input.gtin })) fail('GTIN already exists in this organization.', 409);
@@ -117,7 +117,7 @@ export async function listProducts(input: { q?: string; categoryId?: string; sta
 
 export async function getProduct(identifier: string, organizationId: mongoose.Types.ObjectId) {
   const product = await Product.findOne({ organizationId, identifier: identifier.toUpperCase() }).populate('categoryId', 'name key metadataFields').lean();
-  if (!product) fail('Product was not found in this organization.', 404);
+  if (!product) return fail('Product was not found in this organization.', 404);
   return product;
 }
 
@@ -140,7 +140,7 @@ export async function updateProduct(identifier: string, changes: {
   validateCustomAttributes(category.metadataFields as MetadataField[], attributes);
   if (changes.sku && await Product.exists({ organizationId, sku: changes.sku.toUpperCase(), _id: { $ne: product._id } })) fail('SKU already exists in this organization.', 409);
   if (changes.gtin && await Product.exists({ organizationId, gtin: changes.gtin, _id: { $ne: product._id } })) fail('GTIN already exists in this organization.', 409);
-  Object.assign(product, changes, { updatedBy: actorUserId });
+  product.set({ ...changes, updatedBy: actorUserId });
   try {
     await product.save();
   } catch (error) { handleDuplicate(error); }

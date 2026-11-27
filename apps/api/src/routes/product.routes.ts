@@ -43,7 +43,7 @@ productRouter.post('/', requirePermission('products:write'), validateBody(create
 
 productRouter.get('/:identifier', requirePermission('products:read'), async (request, response, next) => {
   try {
-    const product = await getProduct(request.params.identifier, request.auth!.organizationId);
+    const product = await getProduct(String(request.params.identifier), request.auth!.organizationId);
     response.json({ success: true, data: { product } });
   } catch (error) { next(error); }
 });
