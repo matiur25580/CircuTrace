@@ -26,7 +26,7 @@ export interface AuthOrganization {
   role: OrganizationRole;
 }
 
-async function issueSession(userId: string, organizationId: string, role: OrganizationRole, familyId = randomUUID()) {
+async function issueSession(userId: string, organizationId: string, role: OrganizationRole, familyId: string = randomUUID()) {
   const user = await User.findById(userId);
   if (!user || user.status !== 'active') throw new Error('Account is unavailable.');
   const accessToken = jwt.sign(
@@ -176,11 +176,11 @@ export async function switchOrganization(userId: string, organizationId: string)
   return { session, organization: toAuthOrganization(organization, membership.role as OrganizationRole) };
 }
 
-export function toAuthUser(user: { id: string; name: string; email: string }): AuthUser {
-  return { id: user.id, name: user.name, email: user.email };
+export function toAuthUser(user: { id?: string; _id?: { toString(): string }; name: string; email: string }): AuthUser {
+  return { id: user.id ?? user._id?.toString() ?? '', name: user.name, email: user.email };
 }
-export function toAuthOrganization(organization: { id: string; name: string; slug: string }, role: OrganizationRole): AuthOrganization {
-  return { id: organization.id, name: organization.name, slug: organization.slug, role };
+export function toAuthOrganization(organization: { id?: string; _id?: { toString(): string }; name: string; slug: string }, role: OrganizationRole): AuthOrganization {
+  return { id: organization.id ?? organization._id?.toString() ?? '', name: organization.name, slug: organization.slug, role };
 }
 
 export async function inviteMember(input: { organizationId: string; invitedBy: string; email: string; role: 'admin' | 'member' | 'auditor' }, requestId?: string) {
