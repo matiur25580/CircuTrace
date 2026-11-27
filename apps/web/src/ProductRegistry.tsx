@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { apiRequest } from './lib/api';
 import { ArrowLeft, ArrowRight, Boxes, Factory, Plus, RefreshCw, Search, X } from 'lucide-react';
 
-type Category = { _id: string; name: string; key: string; metadataFields: Array<{ key: string; label: string; type: string; required: boolean; options: string[] }> };
+type MetadataField = { key: string; label: string; type: 'text' | 'number' | 'boolean' | 'date' | 'select'; required: boolean; options: string[] };
+type Category = { _id: string; name: string; key: string; metadataFields: MetadataField[] };
 type Product = {
   _id: string; identifier: string; name: string; description: string; sku?: string; gtin?: string;
   status: 'draft' | 'active' | 'discontinued' | 'recalled';
@@ -10,6 +11,7 @@ type Product = {
   manufacturer: { name: string; countryCode?: string | null };
   suppliers: Array<{ name: string; role: string; countryCode?: string | null }>;
   materials: Array<{ name: string; materialType: string; massGrams: number; recycledContentPercent: number }>;
+  customAttributes?: Record<string, unknown>;
   createdAt: string; updatedAt: string;
 };
 type PageInfo = { page: number; limit: number; total: number; pages: number };
@@ -35,6 +37,7 @@ export default function ProductRegistry({ role }: { role: string }) {
   const [gtin, setGtin] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [countryCode, setCountryCode] = useState('');
+  const [customAttributes, setCustomAttributes] = useState<Record<string, unknown>>({});
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
   const [metadataLabel, setMetadataLabel] = useState('');
@@ -77,9 +80,9 @@ export default function ProductRegistry({ role }: { role: string }) {
       await apiRequest<{ product: Product }>('/products', { method: 'POST', body: JSON.stringify({
         name, description, categoryId, sku: sku || undefined, gtin: gtin || undefined,
         manufacturer: { name: manufacturer, countryCode: countryCode || undefined },
-        suppliers: [], materials: [], customAttributes: {},
+        suppliers: [], materials: [], customAttributes,
       }) });
-      setName(''); setDescription(''); setSku(''); setGtin(''); setManufacturer(''); setCountryCode('');
+      setName(''); setDescription(''); setSku(''); setGtin(''); setManufacturer(''); setCountryCode(''); setCustomAttributes({});
       setShowCreate(false); setPage(1); await loadProducts();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create product.'); }
     finally { setBusy(false); }
@@ -121,6 +124,7 @@ export default function ProductRegistry({ role }: { role: string }) {
         <label>Manufacturer<input required minLength={2} value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="Legal manufacturer name"/></label>
         <label>Manufacturer country code<input value={countryCode} onChange={e => setCountryCode(e.target.value.toUpperCase())} maxLength={2} placeholder="e.g. IN"/></label>
         <label className="registry-wide">Description<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} rows={3} placeholder="Product purpose, model, distinguishing details…"/></label>
+        {categories.find(item => item._id === categoryId)?.metadataFields.map(field => <label key={field.key}>{field.label}{field.required ? ' *' : ' (optional)'}{field.type === 'boolean' ? <input type="checkbox" checked={Boolean(customAttributes[field.key])} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: e.target.checked }))}/> : field.type === 'select' ? <select required={field.required} value={String(customAttributes[field.key] ?? '')} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: e.target.value }))}><option value="">Select value</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <input required={field.required} type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'} step={field.type === 'number' ? 'any' : undefined} value={String(customAttributes[field.key] ?? '')} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value }))}/>}</label>)}
       </div>
       {categories.length === 0 && <p className="registry-hint">No categories exist yet. An owner or administrator must create one before registering products.</p>}
       <div className="registry-form-footer"><span>New records start in Draft status.</span><button className="primary-button" disabled={busy || categories.length === 0}>{busy ? 'Saving…' : 'Create product'}</button></div>
