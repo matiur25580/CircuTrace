@@ -10,7 +10,7 @@ type Product = {
   categoryId: { _id: string; name: string } | string;
   manufacturer: { name: string; countryCode?: string | null };
   suppliers: Array<{ name: string; role: string; countryCode?: string | null }>;
-  materials: Array<{ name: string; materialType: string; massGrams: number; recycledContentPercent: number }>;
+  materials: Array<{ name: string; materialType: string; massGrams: number; recycledContentPercent: number; originCountry?: string | null }>;
   customAttributes?: Record<string, unknown>;
   createdAt: string; updatedAt: string;
 };
