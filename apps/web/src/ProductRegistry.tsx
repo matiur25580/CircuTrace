@@ -37,6 +37,12 @@ export default function ProductRegistry({ role }: { role: string }) {
   const [countryCode, setCountryCode] = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
+  const [metadataLabel, setMetadataLabel] = useState('');
+  const [metadataKey, setMetadataKey] = useState('');
+  const [metadataType, setMetadataType] = useState('text');
+  const [metadataOptions, setMetadataOptions] = useState('');
+  const [metadataRequired, setMetadataRequired] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const loadCategories = useCallback(async () => {
     const result = await apiRequest<{ categories: Category[] }>('/products/categories');
@@ -51,13 +57,14 @@ export default function ProductRegistry({ role }: { role: string }) {
       const params = new URLSearchParams({ page: String(page), limit: '12', sort: 'createdAt', order: 'desc' });
       if (query.trim()) params.set('q', query.trim());
       if (status) params.set('status', status);
+      if (categoryFilter) params.set('categoryId', categoryFilter);
       const result = await apiRequest<{ products: Product[]; pagination: PageInfo }>('/products?' + params.toString());
       setProducts(result.products);
       setPagination(result.pagination);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load product records.');
     } finally { setLoading(false); }
-  }, [page, query, status]);
+  }, [page, query, status, categoryFilter]);
 
   useEffect(() => { loadCategories().catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load categories.')); }, [loadCategories]);
   useEffect(() => { void loadProducts(); }, [loadProducts]);
@@ -81,9 +88,9 @@ export default function ProductRegistry({ role }: { role: string }) {
   const createCategory = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setError('');
     try {
-      const result = await apiRequest<{ category: Category }>('/products/categories', { method: 'POST', body: JSON.stringify({ name: categoryName, description: categoryDescription, metadataFields: [] }) });
+      const result = await apiRequest<{ category: Category }>('/products/categories', { method: 'POST', body: JSON.stringify({ name: categoryName, description: categoryDescription, metadataFields: metadataLabel.trim() ? [{ key: metadataKey, label: metadataLabel, type: metadataType, required: metadataRequired, options: metadataType === 'select' ? metadataOptions.split(',').map(value => value.trim()).filter(Boolean) : [] }] : [] }) });
       setCategories(current => [...current, result.category].sort((a,b) => a.name.localeCompare(b.name)));
-      setCategoryId(result.category._id); setCategoryName(''); setCategoryDescription(''); setShowCategory(false);
+      setCategoryId(result.category._id); setCategoryName(''); setCategoryDescription(''); setMetadataLabel(''); setMetadataKey(''); setMetadataType('text'); setMetadataOptions(''); setMetadataRequired(false); setShowCategory(false);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create category.'); }
     finally { setBusy(false); }
   };
@@ -118,8 +125,16 @@ export default function ProductRegistry({ role }: { role: string }) {
       {categories.length === 0 && <p className="registry-hint">No categories exist yet. An owner or administrator must create one before registering products.</p>}
       <div className="registry-form-footer"><span>New records start in Draft status.</span><button className="primary-button" disabled={busy || categories.length === 0}>{busy ? 'Saving…' : 'Create product'}</button></div>
     </form>}
-    {showCategory && <form className="registry-form panel" onSubmit={createCategory}><div className="panel-heading"><div><h3>Create product category</h3><p>Category metadata can be configured as a separate step.</p></div><button type="button" className="close-button" onClick={() => setShowCategory(false)} aria-label="Close"><X size={17}/></button></div><div className="registry-form-grid"><label>Category name<input required minLength={2} maxLength={80} value={categoryName} onChange={e => setCategoryName(e.target.value)} placeholder="e.g. Consumer electronics"/></label><label>Category description<input maxLength={500} value={categoryDescription} onChange={e => setCategoryDescription(e.target.value)} placeholder="What products belong here?"/></label></div><div className="registry-form-footer"><span>Only workspace owners and administrators can configure categories.</span><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Create category'}</button></div></form>}
-    <div className="registry-toolbar"><div className="registry-search"><Search size={16}/><input aria-label="Search products" placeholder="Search name, identifier, SKU, GTIN or manufacturer…" value={query} onChange={e => { setPage(1); setQuery(e.target.value); }}/></div><select aria-label="Filter by status" value={status} onChange={e => { setPage(1); setStatus(e.target.value); }}><option value="">All statuses</option><option value="draft">Draft</option><option value="active">Active</option><option value="discontinued">Discontinued</option><option value="recalled">Recalled</option></select>{canConfigure && <button className="subtle-button" onClick={() => { setError(''); setShowCategory(value => !value); }}><Boxes size={14}/> New category</button>}</div>
+    {showCategory && <form className="registry-form panel" onSubmit={createCategory}><div className="panel-heading"><div><h3>Create product category</h3><p>Category metadata can be configured as a separate step.</p></div><button type="button" className="close-button" onClick={() => setShowCategory(false)} aria-label="Close"><X size={17}/></button></div><div className="registry-form-grid">
+      <label>Category name<input required minLength={2} maxLength={80} value={categoryName} onChange={e => setCategoryName(e.target.value)} placeholder="e.g. Consumer electronics"/></label>
+      <label>Category description<input maxLength={500} value={categoryDescription} onChange={e => setCategoryDescription(e.target.value)} placeholder="What products belong here?"/></label>
+      <label>Metadata field label (optional)<input value={metadataLabel} onChange={e => { setMetadataLabel(e.target.value); setMetadataKey(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')); }} placeholder="e.g. Batch number"/></label>
+      <label>Metadata key<input value={metadataKey} onChange={e => setMetadataKey(e.target.value)} pattern="[a-z][a-zA-Z0-9_]{0,39}" placeholder="batchNumber"/></label>
+      <label>Field type<select value={metadataType} onChange={e => setMetadataType(e.target.value)}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Boolean</option><option value="date">Date</option><option value="select">Select</option></select></label>
+      {metadataType === 'select' && <label>Select options (comma-separated)<input value={metadataOptions} onChange={e => setMetadataOptions(e.target.value)} placeholder="A, B, C"/></label>}
+      <label className="metadata-required"><input type="checkbox" checked={metadataRequired} onChange={e => setMetadataRequired(e.target.checked)}/> Required field</label>
+    </div><div className="registry-form-footer"><span>Only workspace owners and administrators can configure categories.</span><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Create category'}</button></div></form>}
+    <div className="registry-toolbar"><div className="registry-search"><Search size={16}/><input aria-label="Search products" placeholder="Search name, identifier, SKU, GTIN or manufacturer…" value={query} onChange={e => { setPage(1); setQuery(e.target.value); }}/></div><select aria-label="Filter by category" value={categoryFilter} onChange={e => { setPage(1); setCategoryFilter(e.target.value); }}><option value="">All categories</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select><select aria-label="Filter by status" value={status} onChange={e => { setPage(1); setStatus(e.target.value); }}><option value="">All statuses</option><option value="draft">Draft</option><option value="active">Active</option><option value="discontinued">Discontinued</option><option value="recalled">Recalled</option></select>{canConfigure && <button className="subtle-button" onClick={() => { setError(''); setShowCategory(value => !value); }}><Boxes size={14}/> New category</button>}</div>
     <div className="panel registry-table-panel"><div className="registry-table-heading"><div><h3>Product records</h3><p>Records visible to your active organization only</p></div><span className="registry-count">{pagination.total} total</span></div>
       {loading ? <div className="registry-empty">Loading product records…</div> : products.length === 0 ? <div className="registry-empty"><PackageSearchFallback/><strong>No products found</strong><span>Register your first product or adjust the search filters.</span></div> : <div className="registry-table-wrap"><table className="registry-table"><thead><tr><th>Product identity</th><th>Category</th><th>Manufacturer</th><th>Status</th><th>Created</th><th/></tr></thead><tbody>{products.map(product => <tr key={product.identifier} onClick={() => setSelected(product)} className={selected?.identifier === product.identifier ? 'selected' : ''}><td><strong>{product.name}</strong><small>{product.identifier}{product.sku ? ' · SKU ' + product.sku : ''}</small></td><td>{categoryLabel(product)}</td><td>{product.manufacturer.name}<small>{product.manufacturer.countryCode || 'Country not set'}</small></td><td><span className={'product-status ' + product.status}>{product.status}</span></td><td>{new Date(product.createdAt).toLocaleDateString()}</td><td><ArrowRight size={15}/></td></tr>)}</tbody></table></div>}
       <div className="registry-pagination"><span>Page {pagination.page} of {Math.max(1,pagination.pages)}</span><div><button className="subtle-button" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}><ArrowLeft size={13}/> Previous</button><button className="subtle-button" disabled={page >= pagination.pages || loading} onClick={() => setPage(value => value + 1)}>Next <ArrowRight size={13}/></button></div></div>
