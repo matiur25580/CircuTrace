@@ -50,7 +50,7 @@ productRouter.get('/:identifier', requirePermission('products:read'), async (req
 
 productRouter.patch('/:identifier', requirePermission('products:write'), validateBody(updateProductSchema), async (request, response, next) => {
   try {
-    const product = await updateProduct(request.params.identifier, request.body, request.auth!.organizationId, request.auth!.userId, request.requestId);
+    const product = await updateProduct(String(request.params.identifier), request.body, request.auth!.organizationId, request.auth!.userId, request.requestId);
     response.json({ success: true, data: { product } });
   } catch (error) { next(error); }
 });

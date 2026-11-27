@@ -129,13 +129,13 @@ export async function updateProduct(identifier: string, changes: {
   customAttributes?: Record<string, unknown>;
 }, organizationId: mongoose.Types.ObjectId, actorUserId: mongoose.Types.ObjectId, requestId?: string) {
   const product = await Product.findOne({ organizationId, identifier: identifier.toUpperCase() });
-  if (!product) fail('Product was not found in this organization.', 404);
+  if (!product) return fail('Product was not found in this organization.', 404);
   if (changes.status && !canTransitionProductStatus(product.status as ProductStatus, changes.status)) {
     fail(`Product status cannot transition from ${product.status} to ${changes.status}.`, 409);
   }
   const categoryId = changes.categoryId ?? product.categoryId.toString();
   const category = await ProductCategory.findOne({ _id: categoryId, organizationId }).lean();
-  if (!category) fail('Product category was not found in this organization.', 404);
+  if (!category) return fail('Product category was not found in this organization.', 404);
   const attributes = changes.customAttributes ?? product.customAttributes as Record<string, unknown>;
   validateCustomAttributes(category.metadataFields as MetadataField[], attributes);
   if (changes.sku && await Product.exists({ organizationId, sku: changes.sku.toUpperCase(), _id: { $ne: product._id } })) fail('SKU already exists in this organization.', 409);
