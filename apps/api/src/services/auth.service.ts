@@ -27,7 +27,7 @@ export interface AuthOrganization {
 }
 
 async function issueSession(userId: string, organizationId: string, role: OrganizationRole, familyId = randomUUID()) {
-  const user = await User.findById(userId).select('+passwordHash');
+  const user = await User.findById(userId);
   if (!user || user.status !== 'active') throw new Error('Account is unavailable.');
   const accessToken = jwt.sign(
     { org: organizationId, role, permissions: rolePermissions[role] },
