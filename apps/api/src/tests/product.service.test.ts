@@ -24,4 +24,20 @@ describe('product identity rules', () => {
     expect(() => validateCustomAttributes(fields, { batchNumber: 'B-42', unknown: 'value' })).toThrow('Unknown');
     expect(() => validateCustomAttributes(fields, { batchNumber: 'B-42', grade: 'C' })).toThrow('invalid');
   });
+  it('validates numeric, boolean and date metadata types', () => {
+    const fields = [
+      { key: 'mass', label: 'Mass', type: 'number' as const, required: true, options: [] },
+      { key: 'repairable', label: 'Repairable', type: 'boolean' as const, required: false, options: [] },
+      { key: 'madeOn', label: 'Made on', type: 'date' as const, required: false, options: [] },
+    ];
+    expect(() => validateCustomAttributes(fields, { mass: 12.5, repairable: false, madeOn: '2026-10-12' })).not.toThrow();
+    expect(() => validateCustomAttributes(fields, { mass: '12.5' })).toThrow('invalid');
+  });
+
+  it('does not allow backward lifecycle transitions or reactivation after recall', () => {
+    expect(canTransitionProductStatus('active', 'discontinued')).toBe(true);
+    expect(canTransitionProductStatus('discontinued', 'recalled')).toBe(true);
+    expect(canTransitionProductStatus('active', 'draft')).toBe(false);
+    expect(canTransitionProductStatus('recalled', 'active')).toBe(false);
+  });
 });
