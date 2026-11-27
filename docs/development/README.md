@@ -1,15 +1,13 @@
 # Local development
 
 ## Prerequisites
-
 - Node.js 22+
 - npm 10+
-- Docker Desktop or Docker Engine (optional, for MongoDB and Redis)
+- Docker Desktop or Docker Engine (optional)
 
 ## Setup
-
-1. Copy `.env.example` to `.env`.
-2. Start infrastructure: `docker compose up -d mongodb redis`.
+1. Copy `.env.example` to `.env` and set a unique `ACCESS_TOKEN_SECRET`.
+2. Start MongoDB: `docker compose up -d mongodb`.
 3. Install dependencies: `npm install`.
 4. Start frontend and API: `npm run dev`.
 
@@ -17,12 +15,18 @@ Frontend: http://localhost:5173
 API health: http://localhost:4000/api/v1/health  
 API readiness: http://localhost:4000/api/v1/health/ready
 
-## Quality checks
+## Authentication
+- Register at the frontend to create a user and first organization.
+- Registration requires a 12+ character password containing lowercase, uppercase and numeric characters.
+- Refresh sessions are held in an HttpOnly cookie; access tokens stay in memory in the browser.
+- Use `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` and `GET /api/v1/auth/me`.
+- Organization endpoints: `GET/POST /api/v1/organizations`, `POST /api/v1/organizations/switch`, `GET /api/v1/organizations/members`, `POST /api/v1/organizations/members/invitations`, `POST /api/v1/organizations/members/invitations/accept`, `PATCH/DELETE /api/v1/organizations/members/:membershipId`, `GET /api/v1/organizations/audit-events`.
+- Invitation creation returns a one-time token for manual delivery; email delivery is not included.
 
+## Quality checks
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
 - `npm run lint`
-- `npm run format:check`
 
-The initial UI uses clearly labeled sample dashboard data. No production metrics or customer records are included.
+The dashboard intentionally shows placeholders until product workflows exist; it does not present fabricated operational metrics.
