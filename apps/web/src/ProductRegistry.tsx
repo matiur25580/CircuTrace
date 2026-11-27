@@ -80,7 +80,7 @@ export default function ProductRegistry({ role }: { role: string }) {
       await apiRequest<{ product: Product }>('/products', { method: 'POST', body: JSON.stringify({
         name, description, categoryId, sku: sku || undefined, gtin: gtin || undefined,
         manufacturer: { name: manufacturer, countryCode: countryCode || undefined },
-        suppliers: [], materials: [], customAttributes,
+        suppliers: [], materials: [], customAttributes: { ...Object.fromEntries((categories.find(item => item._id === categoryId)?.metadataFields ?? []).filter(field => field.type === 'boolean' && customAttributes[field.key] === undefined).map(field => [field.key, false])), ...customAttributes },
       }) });
       setName(''); setDescription(''); setSku(''); setGtin(''); setManufacturer(''); setCountryCode(''); setCustomAttributes({});
       setShowCreate(false); setPage(1); await loadProducts();
