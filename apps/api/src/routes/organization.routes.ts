@@ -103,7 +103,14 @@ organizationRouter.delete('/members/:membershipId', requirePermission('members:m
     const target = await Membership.findOne({ _id: request.params.membershipId, organizationId: request.auth!.organizationId, status: 'active' });
     if (!target) { response.status(404).json({ success: false, error: { code: 'MEMBERSHIP_NOT_FOUND', message: 'Active membership was not found.' } }); return; }
     if (target.userId.equals(request.auth!.userId) || target.role === 'owner') {
-      response.status(403).json({ success: false, error: { code: 'MEMBERSHIP_PROTECTED', message: 'You cannot remove yourself or the organization owner.' } }); return;
+      response.status(403).json({
+        success: false,
+        error: {
+          code: 'MEMBERSHIP_PROTECTED',
+          message: 'You cannot remove yourself or the organization owner.',
+        },
+      });
+      return;
     }
     target.status = 'removed';
     await target.save();
