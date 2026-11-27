@@ -129,7 +129,7 @@ export default function ProductRegistry({ role }: { role: string }) {
       <div className="panel-heading"><div><h3>Register a product</h3><p>A unique CircuTrace identifier will be allocated automatically.</p></div><button type="button" className="close-button" onClick={() => setShowCreate(false)} aria-label="Close"><X size={17}/></button></div>
       <div className="registry-form-grid">
         <label>Product name<input required minLength={2} maxLength={160} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Recycled aluminium bottle"/></label>
-        <label>Category<select required value={categoryId} onChange={e => setCategoryId(e.target.value)}><option value="">Select category</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+        <label>Category<select required value={categoryId} onChange={e => { setCategoryId(e.target.value); setCustomAttributes({}); }}><option value="">Select category</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
         <label>SKU (optional)<input value={sku} onChange={e => setSku(e.target.value)} maxLength={64} placeholder="Internal stock code"/></label>
         <label>GTIN (optional)<input value={gtin} onChange={e => setGtin(e.target.value)} inputMode="numeric" placeholder="8, 12, 13 or 14 digits"/></label>
         <label>Manufacturer<input required minLength={2} value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="Legal manufacturer name"/></label>
