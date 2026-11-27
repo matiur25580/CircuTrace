@@ -128,7 +128,13 @@ export async function rotateRefreshToken(rawToken: string) {
   }
   const session = await issueSession(existing.userId.toString(), existing.organizationId.toString(), membership.role as OrganizationRole, existing.familyId);
   await RefreshToken.updateOne({ tokenHash: replacementHash }, { $set: { revokedAt: new Date(), replacedByTokenHash: hashToken(session.refreshToken) } });
-  return session;
+  const user = await User.findById(existing.userId).select('name email');
+  if (!user) throw new Error('Account is unavailable.');
+  return {
+    ...session,
+    user: toAuthUser(user),
+    organization: toAuthOrganization(organization, membership.role as OrganizationRole),
+  };
 }
 
 export async function revokeRefreshToken(rawToken?: string) {

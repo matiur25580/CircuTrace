@@ -13,6 +13,9 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   COOKIE_SECURE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
 }).superRefine((value, context) => {
+  if (value.NODE_ENV === 'production' && !value.COOKIE_SECURE) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['COOKIE_SECURE'], message: 'Secure cookies are required in production.' });
+  }
   if (value.NODE_ENV === 'production' && value.ACCESS_TOKEN_SECRET === 'local-development-only-secret-change-me-32') {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['ACCESS_TOKEN_SECRET'], message: 'A unique production token secret is required.' });
   }

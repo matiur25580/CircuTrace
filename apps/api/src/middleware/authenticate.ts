@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { Membership } from '../models/membership.model.js';
+import { User } from '../models/user.model.js';
 import { Organization } from '../models/organization.model.js';
 import { rolePermissions, type AuthContext, type OrganizationRole } from '../types/auth.js';
 
@@ -24,7 +25,8 @@ export const authenticate: RequestHandler = async (request, response, next) => {
       userId: payload.sub, organizationId: payload.org, status: 'active',
     });
     const organization = await Organization.findOne({ _id: payload.org, status: 'active' });
-    if (!membership || !organization) {
+    const user = await User.findOne({ _id: payload.sub, status: 'active' });
+    if (!membership || !organization || !user) {
       response.status(403).json({ success: false, error: { code: 'TENANT_ACCESS_DENIED', message: 'Active organization membership is required.' } });
       return;
     }

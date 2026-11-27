@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { env } from '../config/env.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requirePermission } from '../middleware/require-permission.js';
 import { validateBody } from '../middleware/validate.js';
@@ -29,7 +30,7 @@ organizationRouter.post('/switch', validateBody(switchOrganizationSchema), async
     const result = await switchOrganization(request.auth!.userId.toString(), request.body.organizationId);
     response.cookie('circutrace_refresh', result.session.refreshToken, {
       httpOnly: true, secure: process.env.COOKIE_SECURE === 'true', sameSite: 'strict',
-      path: '/api/v1/auth', maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/api/v1/auth', maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
     });
     response.json({ success: true, data: { accessToken: result.session.accessToken, expiresIn: result.session.expiresIn, organization: result.organization } });
   } catch (error) { next(error); }

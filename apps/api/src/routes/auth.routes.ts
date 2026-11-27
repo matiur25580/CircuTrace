@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { env } from '../config/env.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { validateBody } from '../middleware/validate.js';
@@ -7,6 +8,7 @@ import { login, register, revokeRefreshToken, rotateRefreshToken } from '../serv
 import { User } from '../models/user.model.js';
 
 export const authRouter = Router();
+authRouter.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 15, standardHeaders: 'draft-7', legacyHeaders: false }));
 const cookieName = 'circutrace_refresh';
 const cookieOptions = () => ({
   httpOnly: true,
@@ -48,7 +50,7 @@ authRouter.post('/refresh', async (request, response, next) => {
     }
     const session = await rotateRefreshToken(token);
     setRefreshCookie(response, session.refreshToken);
-    response.json({ success: true, data: { accessToken: session.accessToken, expiresIn: session.expiresIn } });
+    response.json({ success: true, data: { accessToken: session.accessToken, expiresIn: session.expiresIn, user: session.user, organization: session.organization } });
   } catch (error) { clearRefreshCookie(response); next(error); }
 });
 
