@@ -46,13 +46,16 @@ export function validateCustomAttributes(fields: MetadataField[], attributes: Re
 }
 
 async function nextIdentifier(organizationId: mongoose.Types.ObjectId): Promise<string> {
-  const sequence = await ProductSequence.findOneAndUpdate(
-    { organizationId },
-    { $inc: { sequence: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true },
-  );
-  if (!sequence) throw new Error('Unable to allocate a product identifier.');
-  return formatProductIdentifier(organizationId.toString(), sequence.sequence);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const sequence = await ProductSequence.findOneAndUpdate({ organizationId }, { $inc: { sequence: 1 } }, { new: true, upsert: true });
+      if (!sequence) throw new Error('Unable to allocate a product identifier.');
+      return formatProductIdentifier(organizationId.toString(), sequence.sequence);
+    } catch (error) {
+      if (!(typeof error === 'object' && error !== null && 'code' in error && error.code === 11000) || attempt === 2) throw error;
+    }
+  }
+  throw new Error('Unable to allocate a product identifier.');
 }
 
 function handleDuplicate(error: unknown): never {

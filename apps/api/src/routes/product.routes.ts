@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import { authenticate } from '../middleware/authenticate.js';
 import { requirePermission } from '../middleware/require-permission.js';
 import { validateBody } from '../middleware/validate.js';

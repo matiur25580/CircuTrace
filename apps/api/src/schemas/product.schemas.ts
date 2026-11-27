@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+const validGtin = (value: string) => {
+  if (!/^(?:[0-9]{8}|[0-9]{12,14})$/.test(value)) return false;
+  const digits = value.split('').map(Number);
+  const checkDigit = digits.pop()!;
+  const sum = digits.reverse().reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === checkDigit;
+};
 const countryCode = z.string().trim().regex(/^[A-Za-z]{2}$/).transform((value) => value.toUpperCase()).optional().nullable();
 const manufacturerSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -29,7 +36,7 @@ export const createCategorySchema = z.object({
     type: z.enum(['text', 'number', 'boolean', 'date', 'select']),
     required: z.boolean().default(false),
     options: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
-  }).strict()).max(30).default([]),
+  }).strict()).max(30).refine((fields) => new Set(fields.map((field) => field.key)).size === fields.length, 'Metadata field keys must be unique.').refine((fields) => fields.every((field) => field.type !== 'select' || field.options.length > 0), 'Select metadata fields must define at least one option.').default([]),
 }).strict();
 
 export const createProductSchema = z.object({
@@ -37,7 +44,7 @@ export const createProductSchema = z.object({
   description: z.string().trim().max(2000).default(''),
   categoryId: z.string().regex(/^[a-f\d]{24}$/i),
   sku: z.string().trim().min(1).max(64).optional(),
-  gtin: z.string().regex(/^(?:[0-9]{8}|[0-9]{12,14})$/).optional(),
+  gtin: z.string().refine(validGtin, 'GTIN must contain a valid check digit.').optional(),
   manufacturer: manufacturerSchema,
   suppliers: z.array(supplierSchema).max(30).default([]),
   materials: z.array(materialSchema).max(50).default([]),
@@ -49,7 +56,7 @@ export const updateProductSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   categoryId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   sku: z.string().trim().min(1).max(64).optional().nullable(),
-  gtin: z.string().regex(/^(?:[0-9]{8}|[0-9]{12,14})$/).optional().nullable(),
+  gtin: z.string().refine(validGtin, 'GTIN must contain a valid check digit.').optional().nullable(),
   status: z.enum(['draft', 'active', 'discontinued', 'recalled']).optional(),
   manufacturer: manufacturerSchema.optional(),
   suppliers: z.array(supplierSchema).max(30).optional(),
