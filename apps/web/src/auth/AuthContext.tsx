@@ -15,8 +15,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result.user && result.organization) setState({ user: result.user, organization: result.organization });
   };
   const refresh = useCallback(async () => {
-    const result = await apiRequest<{ accessToken: string }>('/auth/refresh', { method: 'POST' });
+    const result = await apiRequest<{ accessToken: string; user: AuthUser; organization: Organization }>('/auth/refresh', { method: 'POST' });
     setAccessToken(result.accessToken);
+    setState({ user: result.user, organization: result.organization });
   }, []);
   useEffect(() => { refresh().catch(() => setState(null)).finally(() => setLoading(false)); }, [refresh]);
   const login = async (email: string, password: string) => {

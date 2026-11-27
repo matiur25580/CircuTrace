@@ -7,6 +7,9 @@ import { createOrganizationSchema, switchOrganizationSchema } from '../schemas/a
 import { createOrganization, listOrganizations, switchOrganization } from '../services/auth.service.js';
 import { AuditEvent } from '../models/audit-event.model.js';
 import { Membership } from '../models/membership.model.js';
+import { inviteMember, acceptInvitation } from '../services/auth.service.js';
+import { inviteMemberSchema, acceptInvitationSchema, updateMemberRoleSchema } from '../schemas/auth.schemas.js';
+import mongoose from 'mongoose';
 
 export const organizationRouter = Router();
 organizationRouter.use(authenticate);
@@ -54,5 +57,57 @@ organizationRouter.get('/audit-events', requirePermission('audit:read'), async (
       AuditEvent.countDocuments({ organizationId: request.auth!.organizationId }),
     ]);
     response.json({ success: true, data: { events, pagination: { page, limit, total, pages: Math.ceil(total / limit) } } });
+  } catch (error) { next(error); }
+});
+
+organizationRouter.post('/members/invitations', requirePermission('members:invite'), validateBody(inviteMemberSchema), async (request, response, next) => {
+  try {
+    const invitation = await inviteMember({
+      organizationId: request.auth!.organizationId.toString(),
+      invitedBy: request.auth!.userId.toString(),
+      email: request.body.email,
+      role: request.body.role,
+    }, request.requestId);
+    response.status(201).json({ success: true, data: { invitation, delivery: 'manual' } });
+  } catch (error) { next(error); }
+});
+
+organizationRouter.post('/members/invitations/accept', authenticate, validateBody(acceptInvitationSchema), async (request, response, next) => {
+  try {
+    const organization = await acceptInvitation(request.auth!.userId.toString(), request.body.token, request.requestId);
+    response.status(201).json({ success: true, data: { organization } });
+  } catch (error) { next(error); }
+});
+
+organizationRouter.patch('/members/:membershipId', requirePermission('members:manage'), validateBody(updateMemberRoleSchema), async (request, response, next) => {
+  try {
+    if (!mongoose.isValidObjectId(request.params.membershipId)) {
+      response.status(400).json({ success: false, error: { code: 'INVALID_MEMBER_ID', message: 'Membership identifier is invalid.' } }); return;
+    }
+    const target = await Membership.findOne({ _id: request.params.membershipId, organizationId: request.auth!.organizationId, status: 'active' });
+    if (!target) { response.status(404).json({ success: false, error: { code: 'MEMBERSHIP_NOT_FOUND', message: 'Active membership was not found.' } }); return; }
+    if (target.userId.equals(request.auth!.userId)) { response.status(400).json({ success: false, error: { code: 'SELF_ROLE_CHANGE_NOT_ALLOWED', message: 'You cannot change your own organization role.' } }); return; }
+    if (target.role === 'owner') { response.status(403).json({ success: false, error: { code: 'OWNER_PROTECTED', message: 'Ownership changes require a dedicated ownership-transfer workflow.' } }); return; }
+    target.role = request.body.role;
+    await target.save();
+    await AuditEvent.create({ organizationId: request.auth!.organizationId, actorUserId: request.auth!.userId, action: 'member.role_updated', targetType: 'membership', targetId: target.id, metadata: { role: target.role }, requestId: request.requestId });
+    response.json({ success: true, data: { membership: { id: target.id, role: target.role } } });
+  } catch (error) { next(error); }
+});
+
+organizationRouter.delete('/members/:membershipId', requirePermission('members:manage'), async (request, response, next) => {
+  try {
+    if (!mongoose.isValidObjectId(request.params.membershipId)) {
+      response.status(400).json({ success: false, error: { code: 'INVALID_MEMBER_ID', message: 'Membership identifier is invalid.' } }); return;
+    }
+    const target = await Membership.findOne({ _id: request.params.membershipId, organizationId: request.auth!.organizationId, status: 'active' });
+    if (!target) { response.status(404).json({ success: false, error: { code: 'MEMBERSHIP_NOT_FOUND', message: 'Active membership was not found.' } }); return; }
+    if (target.userId.equals(request.auth!.userId) || target.role === 'owner') {
+      response.status(403).json({ success: false, error: { code: 'MEMBERSHIP_PROTECTED', message: 'You cannot remove yourself or the organization owner.' }); return;
+    }
+    target.status = 'removed';
+    await target.save();
+    await AuditEvent.create({ organizationId: request.auth!.organizationId, actorUserId: request.auth!.userId, action: 'member.removed', targetType: 'membership', targetId: target.id, requestId: request.requestId });
+    response.status(204).send();
   } catch (error) { next(error); }
 });

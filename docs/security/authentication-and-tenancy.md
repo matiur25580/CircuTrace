@@ -22,6 +22,10 @@ Tenant-owned queries must always include `request.auth.organizationId`. Never ac
 - Member: organization/member read and product read/write.
 - Auditor: organization/member read, product read and audit read; no product writes.
 
+## Membership lifecycle
+
+Organization owners and administrators can create email-bound invitations for admin, member or auditor roles. Invitation secrets are high-entropy, stored only as SHA-256 fingerprints, expire after seven days and can be accepted only by an authenticated account with the invited email address. Invitation acceptance is one-time. Member role changes and removals are tenant-scoped and audited; owner removal and self-role changes are blocked. The API returns an invitation token once because outbound email delivery is not configured yet; deliver it through a trusted channel and never log it.
+
 ## Important implementation boundaries
 
 - Email verification, password reset, invitations, MFA, SSO and account recovery are not implemented in this milestone.

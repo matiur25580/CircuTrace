@@ -7,6 +7,7 @@ import { Organization } from '../models/organization.model.js';
 import { Membership } from '../models/membership.model.js';
 import { RefreshToken } from '../models/refresh-token.model.js';
 import { AuditEvent } from '../models/audit-event.model.js';
+import { Invitation } from '../models/invitation.model.js';
 import { rolePermissions, type OrganizationRole } from '../types/auth.js';
 
 const accessTokenSeconds = 15 * 60;
@@ -114,11 +115,9 @@ export async function rotateRefreshToken(rawToken: string) {
     const error = new Error('Organization access is no longer active.') as Error & { statusCode: number };
     error.statusCode = 403; throw error;
   }
-  const replacement = randomBytes(48).toString('base64url');
-  const replacementHash = hashToken(replacement);
   const changed = await RefreshToken.findOneAndUpdate(
     { _id: existing._id, revokedAt: null },
-    { $set: { revokedAt: new Date(), replacedByTokenHash: replacementHash } },
+    { $set: { revokedAt: new Date() } },
     { new: true },
   );
   if (!changed) {
@@ -127,7 +126,7 @@ export async function rotateRefreshToken(rawToken: string) {
     error.statusCode = 401; throw error;
   }
   const session = await issueSession(existing.userId.toString(), existing.organizationId.toString(), membership.role as OrganizationRole, existing.familyId);
-  await RefreshToken.updateOne({ tokenHash: replacementHash }, { $set: { revokedAt: new Date(), replacedByTokenHash: hashToken(session.refreshToken) } });
+  await RefreshToken.updateOne({ _id: existing._id }, { $set: { replacedByTokenHash: hashToken(session.refreshToken) } });
   const user = await User.findById(existing.userId).select('name email');
   if (!user) throw new Error('Account is unavailable.');
   return {
@@ -182,4 +181,51 @@ export function toAuthUser(user: { id: string; name: string; email: string }): A
 }
 export function toAuthOrganization(organization: { id: string; name: string; slug: string }, role: OrganizationRole): AuthOrganization {
   return { id: organization.id, name: organization.name, slug: organization.slug, role };
+}
+
+export async function inviteMember(input: { organizationId: string; invitedBy: string; email: string; role: 'admin' | 'member' | 'auditor' }, requestId?: string) {
+  const email = input.email.toLowerCase().trim();
+  const existingUser = await User.findOne({ email });
+  if (existingUser && await Membership.exists({ userId: existingUser._id, organizationId: input.organizationId, status: 'active' })) {
+    const error = new Error('This user is already an active member.') as Error & { statusCode: number };
+    error.statusCode = 409; throw error;
+  }
+  await Invitation.updateMany({ organizationId: input.organizationId, email, acceptedAt: null, revokedAt: null }, { $set: { revokedAt: new Date() } });
+  const token = randomBytes(48).toString('base64url');
+  await Invitation.create({
+    organizationId: input.organizationId, email, role: input.role,
+    tokenHash: hashToken(token), invitedBy: input.invitedBy,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+  await AuditEvent.create({ organizationId: input.organizationId, actorUserId: input.invitedBy, action: 'member.invited', targetType: 'invitation', metadata: { email, role: input.role }, requestId });
+  return { email, role: input.role, invitationToken: token, expiresInHours: 168 };
+}
+
+export async function acceptInvitation(userId: string, token: string, requestId?: string) {
+  const tokenHash = hashToken(token);
+  const invitation = await Invitation.findOne({ tokenHash }).select('+tokenHash');
+  const user = await User.findById(userId);
+  if (!invitation || !user || invitation.acceptedAt || invitation.revokedAt || invitation.expiresAt <= new Date() || invitation.email !== user.email) {
+    const error = new Error('Invitation is invalid, expired, already used, or belongs to another email.') as Error & { statusCode: number };
+    error.statusCode = 400; throw error;
+  }
+  const claimed = await Invitation.findOneAndUpdate(
+    { _id: invitation._id, acceptedAt: null, revokedAt: null, expiresAt: { $gt: new Date() } },
+    { $set: { acceptedAt: new Date() } },
+    { new: true },
+  );
+  if (!claimed) {
+    const error = new Error('Invitation has already been accepted or revoked.') as Error & { statusCode: number };
+    error.statusCode = 409; throw error;
+  }
+  try {
+    await Membership.create({ userId, organizationId: invitation.organizationId, role: invitation.role, status: 'active', invitedBy: invitation.invitedBy });
+  } catch (error) {
+    await Invitation.updateOne({ _id: invitation._id }, { $set: { acceptedAt: null } });
+    throw error;
+  }
+  await AuditEvent.create({ organizationId: invitation.organizationId, actorUserId: userId, action: 'member.joined', targetType: 'membership', metadata: { email: user.email, role: invitation.role }, requestId });
+  const organization = await Organization.findById(invitation.organizationId);
+  if (!organization) throw new Error('Organization is unavailable.');
+  return toAuthOrganization(organization, invitation.role as OrganizationRole);
 }

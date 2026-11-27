@@ -20,7 +20,8 @@ API readiness: http://localhost:4000/api/v1/health/ready
 - Registration requires a 12+ character password containing lowercase, uppercase and numeric characters.
 - Refresh sessions are held in an HttpOnly cookie; access tokens stay in memory in the browser.
 - Use `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` and `GET /api/v1/auth/me`.
-- Organization endpoints: `GET/POST /api/v1/organizations`, `POST /api/v1/organizations/switch`, `GET /api/v1/organizations/members`, `GET /api/v1/organizations/audit-events`.
+- Organization endpoints: `GET/POST /api/v1/organizations`, `POST /api/v1/organizations/switch`, `GET /api/v1/organizations/members`, `POST /api/v1/organizations/members/invitations`, `POST /api/v1/organizations/members/invitations/accept`, `PATCH/DELETE /api/v1/organizations/members/:membershipId`, `GET /api/v1/organizations/audit-events`.
+- Invitation creation returns a one-time token for manual delivery; email delivery is not included.
 
 ## Quality checks
 - `npm run typecheck`
