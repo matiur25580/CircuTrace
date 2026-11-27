@@ -16,4 +16,11 @@ describe('product request contracts', () => {
     expect(emptySelect.success).toBe(false);
   });
   it('requires at least one product update field', () => { expect(updateProductSchema.safeParse({}).success).toBe(false); });
+  it('accepts a valid GTIN check digit and bounds pagination and sorting', () => {
+    const base = { name: 'Reusable bottle', categoryId: '507f1f77bcf86cd799439011', manufacturer: { name: 'Example Works' } };
+    expect(createProductSchema.safeParse({ ...base, gtin: '4006381333931' }).success).toBe(true);
+    expect(productListQuerySchema.safeParse({ limit: '100', sort: 'name' }).success).toBe(true);
+    expect(productListQuerySchema.safeParse({ limit: '101' }).success).toBe(false);
+    expect(productListQuerySchema.safeParse({ sort: 'organizationId' }).success).toBe(false);
+  });
 });
