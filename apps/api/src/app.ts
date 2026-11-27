@@ -3,7 +3,6 @@ import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
@@ -21,11 +20,25 @@ app.use((request, response, next) => {
   next();
 });
 
-app.use(pinoHttp({
-  level: env.LOG_LEVEL,
-  redact: ['req.headers.authorization', 'req.headers.cookie'],
-  customProps: (request) => ({ requestId: request.requestId }),
-}));
+app.use((request, response, next) => {
+  const startedAt = process.hrtime.bigint();
+  response.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    const log = {
+      level: response.statusCode >= 500 ? 'error' : response.statusCode >= 400 ? 'warn' : 'info',
+      requestId: request.requestId,
+      method: request.method,
+      path: request.path,
+      statusCode: response.statusCode,
+      durationMs: Math.round(durationMs * 100) / 100,
+    };
+    const output = JSON.stringify(log);
+    if (response.statusCode >= 500) console.error(output);
+    else if (response.statusCode >= 400) console.warn(output);
+    else if (env.LOG_LEVEL !== 'silent') console.info(output);
+  });
+  next();
+});
 
 app.use(helmet());
 app.use(cors({
