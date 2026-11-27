@@ -72,7 +72,7 @@ organizationRouter.post('/members/invitations', requirePermission('members:invit
   } catch (error) { next(error); }
 });
 
-organizationRouter.post('/members/invitations/accept', authenticate, validateBody(acceptInvitationSchema), async (request, response, next) => {
+organizationRouter.post('/members/invitations/accept', validateBody(acceptInvitationSchema), async (request, response, next) => {
   try {
     const organization = await acceptInvitation(request.auth!.userId.toString(), request.body.token, request.requestId);
     response.status(201).json({ success: true, data: { organization } });
