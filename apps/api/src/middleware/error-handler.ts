@@ -9,7 +9,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
       ? error.statusCode
       : 500;
 
-  request.log?.error({ err: error, requestId: request.requestId }, 'Request failed');
+  console.error(JSON.stringify({ level: 'error', requestId: request.requestId, message, statusCode }));
 
   response.status(statusCode).json({
     success: false,
