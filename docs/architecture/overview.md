@@ -1,27 +1,22 @@
 # Architecture overview
 
-CircuTrace starts as a modular monolith. Domain boundaries are explicit so independently scaled services can be extracted only when operational evidence justifies the added complexity.
+CircuTrace is a modular monolith with explicit domain boundaries. Services can be extracted only when operational evidence justifies the additional complexity.
 
 ## Applications
-
 - `apps/web`: React + TypeScript single-page application.
 - `apps/api`: Express + TypeScript HTTP API.
-- MongoDB: system of record for tenant-scoped domain data.
-- Redis: reserved infrastructure for future background jobs, caching and rate coordination.
-- Object storage: planned adapter for evidence files; binary uploads are not part of this foundation milestone.
+- MongoDB: tenant-scoped system of record.
+- Redis: reserved for future background jobs, cache and rate coordination.
+- Object storage: planned evidence adapter; binary uploads are not part of the current milestones.
 
 ## API conventions
-
-- Versioned routes live under `/api/v1`.
-- JSON responses use a stable `success` envelope.
+- Versioned routes under `/api/v1`.
+- Stable JSON success envelope and machine-readable errors.
 - Every request receives an `x-request-id`.
-- Error responses expose a stable machine-readable code.
-- Readiness checks report dependency state separately from process liveness.
+- Bounded pagination and tenant-scoped domain queries.
 
-## Security baseline
+## Security
+Helmet, explicit CORS, bounded request bodies, API rate limiting, request IDs, bcrypt credentials, short-lived JWT access tokens, rotating opaque refresh sessions, organization membership checks and database-derived role permissions are implemented. Product registry routes derive tenant scope exclusively from authenticated membership context.
 
-Helmet security headers, explicit CORS origin, bounded JSON request bodies, API rate limiting, request-id propagation and redaction of authorization/cookie headers in logs are enabled. Authentication, tenant resolution, authorization policies, audit events and secure evidence handling are subsequent milestones.
-
-## Data integrity principles
-
-Lifecycle events will be modeled as append-only records with actor, tenant, event time, source and evidence references. Corrections should be represented as compensating or superseding events rather than silently rewriting history. Cryptographic verification and external trust models require a documented threat model before implementation.
+## Data integrity
+Lifecycle events will be append-only with actor, tenant, event time, source and evidence references. Corrections should be represented as compensating or superseding events rather than rewriting history. Product registry updates are audited; a dedicated lifecycle event ledger and public passport verification are later milestones.

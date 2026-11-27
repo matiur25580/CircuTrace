@@ -1,0 +1,172 @@
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { apiRequest } from './lib/api';
+import { ArrowLeft, ArrowRight, Boxes, Factory, Plus, RefreshCw, Search, X } from 'lucide-react';
+
+type MetadataField = { key: string; label: string; type: 'text' | 'number' | 'boolean' | 'date' | 'select'; required: boolean; options: string[] };
+type Category = { _id: string; name: string; key: string; metadataFields: MetadataField[] };
+type Product = {
+  _id: string; identifier: string; name: string; description: string; sku?: string; gtin?: string;
+  status: 'draft' | 'active' | 'discontinued' | 'recalled';
+  categoryId: { _id: string; name: string } | string;
+  manufacturer: { name: string; countryCode?: string | null };
+  suppliers: Array<{ name: string; role: string; countryCode?: string | null }>;
+  materials: Array<{ name: string; materialType: string; massGrams: number; recycledContentPercent: number; originCountry?: string | null }>;
+  customAttributes?: Record<string, unknown>;
+  createdAt: string; updatedAt: string;
+};
+type PageInfo = { page: number; limit: number; total: number; pages: number };
+const emptyPage: PageInfo = { page: 1, limit: 20, total: 0, pages: 0 };
+
+export default function ProductRegistry({ role }: { role: string }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [pagination, setPagination] = useState<PageInfo>(emptyPage);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showCategory, setShowCategory] = useState(false);
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [sku, setSku] = useState('');
+  const [gtin, setGtin] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
+  const [countryCode, setCountryCode] = useState('');
+  const [customAttributes, setCustomAttributes] = useState<Record<string, unknown>>({});
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierRole, setSupplierRole] = useState('supplier');
+  const [supplierCountry, setSupplierCountry] = useState('');
+  const [materialName, setMaterialName] = useState('');
+  const [materialType, setMaterialType] = useState('');
+  const [materialMass, setMaterialMass] = useState('');
+  const [recycledContent, setRecycledContent] = useState('0');
+  const [materialCountry, setMaterialCountry] = useState('');
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+  const [metadataLabel, setMetadataLabel] = useState('');
+  const [metadataKey, setMetadataKey] = useState('');
+  const [metadataType, setMetadataType] = useState('text');
+  const [metadataOptions, setMetadataOptions] = useState('');
+  const [metadataRequired, setMetadataRequired] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('');
+
+  const loadCategories = useCallback(async () => {
+    const result = await apiRequest<{ categories: Category[] }>('/products/categories');
+    setCategories(result.categories);
+    setCategoryId(current => current || result.categories[0]?._id || '');
+  }, []);
+
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: '12', sort: 'createdAt', order: 'desc' });
+      if (query.trim()) params.set('q', query.trim());
+      if (status) params.set('status', status);
+      if (categoryFilter) params.set('categoryId', categoryFilter);
+      const result = await apiRequest<{ products: Product[]; pagination: PageInfo }>('/products?' + params.toString());
+      setProducts(result.products);
+      setPagination(result.pagination);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to load product records.');
+    } finally { setLoading(false); }
+  }, [page, query, status, categoryFilter]);
+
+  useEffect(() => { loadCategories().catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load categories.')); }, [loadCategories]);
+  useEffect(() => { void loadProducts(); }, [loadProducts]);
+
+  const createProduct = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!categoryId) { setError('Create or select a product category first.'); return; }
+    if (materialName.trim() && (!materialType.trim() || !materialMass || Number(materialMass) <= 0)) { setError('A material entry requires a type and positive mass in grams.'); return; }
+    if (Number(recycledContent) < 0 || Number(recycledContent) > 100) { setError('Recycled content must be between 0 and 100 percent.'); return; }
+    setBusy(true); setError('');
+    try {
+      await apiRequest<{ product: Product }>('/products', { method: 'POST', body: JSON.stringify({
+        name, description, categoryId, sku: sku || undefined, gtin: gtin || undefined,
+        manufacturer: { name: manufacturer, countryCode: countryCode || undefined },
+        suppliers: supplierName.trim() ? [{ name: supplierName, role: supplierRole, countryCode: supplierCountry || undefined }] : [],
+        materials: materialName.trim() ? [{ name: materialName, materialType, massGrams: Number(materialMass), recycledContentPercent: Number(recycledContent || 0), originCountry: materialCountry || undefined }] : [], customAttributes: { ...Object.fromEntries((categories.find(item => item._id === categoryId)?.metadataFields ?? []).filter(field => field.type === 'boolean' && customAttributes[field.key] === undefined).map(field => [field.key, false])), ...customAttributes },
+      }) });
+      setName(''); setDescription(''); setSku(''); setGtin(''); setManufacturer(''); setCountryCode(''); setCustomAttributes({}); setSupplierName(''); setSupplierRole('supplier'); setSupplierCountry(''); setMaterialName(''); setMaterialType(''); setMaterialMass(''); setRecycledContent('0'); setMaterialCountry('');
+      setShowCreate(false); setPage(1); await loadProducts();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create product.'); }
+    finally { setBusy(false); }
+  };
+
+  const createCategory = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const result = await apiRequest<{ category: Category }>('/products/categories', { method: 'POST', body: JSON.stringify({ name: categoryName, description: categoryDescription, metadataFields: metadataLabel.trim() ? [{ key: metadataKey, label: metadataLabel, type: metadataType, required: metadataRequired, options: metadataType === 'select' ? metadataOptions.split(',').map(value => value.trim()).filter(Boolean) : [] }] : [] }) });
+      setCategories(current => [...current, result.category].sort((a,b) => a.name.localeCompare(b.name)));
+      setCategoryId(result.category._id); setCategoryName(''); setCategoryDescription(''); setMetadataLabel(''); setMetadataKey(''); setMetadataType('text'); setMetadataOptions(''); setMetadataRequired(false); setShowCategory(false);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create category.'); }
+    finally { setBusy(false); }
+  };
+
+  const changeStatus = async (product: Product, nextStatus: Product['status']) => {
+    setBusy(true); setError('');
+    try {
+      const result = await apiRequest<{ product: Product }>('/products/' + encodeURIComponent(product.identifier), { method: 'PATCH', body: JSON.stringify({ status: nextStatus }) });
+      setProducts(current => current.map(item => item.identifier === product.identifier ? result.product : item));
+      if (selected?.identifier === product.identifier) setSelected(result.product);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to update product status.'); }
+    finally { setBusy(false); }
+  };
+
+  const canConfigure = role === 'owner' || role === 'admin';
+  const categoryLabel = (product: Product) => typeof product.categoryId === 'object' ? product.categoryId.name : 'Product category';
+  return <div className="registry-page">
+    <div className="registry-heading"><div><span className="eyebrow">PRODUCT INTELLIGENCE</span><h1>Product registry</h1><p>Manage organization-owned product identities and their core provenance data.</p></div><div className="registry-actions"><button className="subtle-button" onClick={() => void loadProducts()}><RefreshCw size={14}/> Refresh</button><button className="primary-button" onClick={() => { setError(''); setShowCreate(true); }}><Plus size={15}/> Register product</button></div></div>
+    <div className="registry-stats"><div><span>Registered products</span><strong>{pagination.total.toLocaleString()}</strong></div><div><span>Categories</span><strong>{categories.length}</strong></div><div><span>Current workspace</span><strong>Tenant-scoped</strong></div></div>
+    {error && <div className="registry-error" role="alert">{error}<button onClick={() => setError('')} aria-label="Dismiss error"><X size={14}/></button></div>}
+    {showCreate && <form className="registry-form panel" onSubmit={createProduct}>
+      <div className="panel-heading"><div><h3>Register a product</h3><p>A unique CircuTrace identifier will be allocated automatically.</p></div><button type="button" className="close-button" onClick={() => setShowCreate(false)} aria-label="Close"><X size={17}/></button></div>
+      <div className="registry-form-grid">
+        <label>Product name<input required minLength={2} maxLength={160} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Recycled aluminium bottle"/></label>
+        <label>Category<select required value={categoryId} onChange={e => { setCategoryId(e.target.value); setCustomAttributes({}); }}><option value="">Select category</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+        <label>SKU (optional)<input value={sku} onChange={e => setSku(e.target.value)} maxLength={64} placeholder="Internal stock code"/></label>
+        <label>GTIN (optional)<input value={gtin} onChange={e => setGtin(e.target.value)} inputMode="numeric" placeholder="8, 12, 13 or 14 digits"/></label>
+        <label>Manufacturer<input required minLength={2} value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="Legal manufacturer name"/></label>
+        <label>Manufacturer country code<input value={countryCode} onChange={e => setCountryCode(e.target.value.toUpperCase())} maxLength={2} placeholder="e.g. IN"/></label>
+        <label>Primary supplier (optional)<input value={supplierName} onChange={e => setSupplierName(e.target.value)} maxLength={160} placeholder="Supplier organization"/></label>
+        <label>Supplier role<select value={supplierRole} onChange={e => setSupplierRole(e.target.value)}><option value="supplier">Supplier</option><option value="assembler">Assembler</option><option value="distributor">Distributor</option></select></label>
+        <label>Supplier country code<input value={supplierCountry} onChange={e => setSupplierCountry(e.target.value.toUpperCase())} maxLength={2} placeholder="e.g. IN"/></label>
+        <label>Primary material (optional)<input value={materialName} onChange={e => setMaterialName(e.target.value)} maxLength={120} placeholder="e.g. Aluminium"/></label>
+        <label>Material type<input value={materialType} onChange={e => setMaterialType(e.target.value)} maxLength={80} placeholder="e.g. Metal"/></label>
+        <label>Material mass (grams)<input type="number" min="0.001" max="1000000000" step="any" value={materialMass} onChange={e => setMaterialMass(e.target.value)} placeholder="e.g. 245"/></label>
+        <label>Recycled content (%)<input type="number" min="0" max="100" step="any" value={recycledContent} onChange={e => setRecycledContent(e.target.value)}/></label>
+        <label>Material origin country<input value={materialCountry} onChange={e => setMaterialCountry(e.target.value.toUpperCase())} maxLength={2} placeholder="e.g. IN"/></label>
+        <label className="registry-wide">Description<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} rows={3} placeholder="Product purpose, model, distinguishing details…"/></label>
+        {categories.find(item => item._id === categoryId)?.metadataFields.map(field => <label key={field.key}>{field.label}{field.required ? ' *' : ' (optional)'}{field.type === 'boolean' ? <input type="checkbox" checked={Boolean(customAttributes[field.key])} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: e.target.checked }))}/> : field.type === 'select' ? <select required={field.required} value={String(customAttributes[field.key] ?? '')} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: e.target.value }))}><option value="">Select value</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <input required={field.required} type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'} step={field.type === 'number' ? 'any' : undefined} value={String(customAttributes[field.key] ?? '')} onChange={e => setCustomAttributes(current => ({ ...current, [field.key]: field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value }))}/>}</label>)}
+      </div>
+      {categories.length === 0 && <p className="registry-hint">No categories exist yet. An owner or administrator must create one before registering products.</p>}
+      <div className="registry-form-footer"><span>New records start in Draft status.</span><button className="primary-button" disabled={busy || categories.length === 0}>{busy ? 'Saving…' : 'Create product'}</button></div>
+    </form>}
+    {showCategory && <form className="registry-form panel" onSubmit={createCategory}><div className="panel-heading"><div><h3>Create product category</h3><p>Category metadata can be configured as a separate step.</p></div><button type="button" className="close-button" onClick={() => setShowCategory(false)} aria-label="Close"><X size={17}/></button></div><div className="registry-form-grid">
+      <label>Category name<input required minLength={2} maxLength={80} value={categoryName} onChange={e => setCategoryName(e.target.value)} placeholder="e.g. Consumer electronics"/></label>
+      <label>Category description<input maxLength={500} value={categoryDescription} onChange={e => setCategoryDescription(e.target.value)} placeholder="What products belong here?"/></label>
+      <label>Metadata field label (optional)<input value={metadataLabel} onChange={e => { setMetadataLabel(e.target.value); setMetadataKey(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')); }} placeholder="e.g. Batch number"/></label>
+      <label>Metadata key<input value={metadataKey} onChange={e => setMetadataKey(e.target.value)} pattern="[a-z][a-zA-Z0-9_]{0,39}" placeholder="batchNumber"/></label>
+      <label>Field type<select value={metadataType} onChange={e => setMetadataType(e.target.value)}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Boolean</option><option value="date">Date</option><option value="select">Select</option></select></label>
+      {metadataType === 'select' && <label>Select options (comma-separated)<input value={metadataOptions} onChange={e => setMetadataOptions(e.target.value)} placeholder="A, B, C"/></label>}
+      <label className="metadata-required"><input type="checkbox" checked={metadataRequired} onChange={e => setMetadataRequired(e.target.checked)}/> Required field</label>
+    </div><div className="registry-form-footer"><span>Only workspace owners and administrators can configure categories.</span><button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Create category'}</button></div></form>}
+    <div className="registry-toolbar"><div className="registry-search"><Search size={16}/><input aria-label="Search products" placeholder="Search name, identifier, SKU, GTIN or manufacturer…" value={query} onChange={e => { setPage(1); setQuery(e.target.value); }}/></div><select aria-label="Filter by category" value={categoryFilter} onChange={e => { setPage(1); setCategoryFilter(e.target.value); }}><option value="">All categories</option>{categories.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}</select><select aria-label="Filter by status" value={status} onChange={e => { setPage(1); setStatus(e.target.value); }}><option value="">All statuses</option><option value="draft">Draft</option><option value="active">Active</option><option value="discontinued">Discontinued</option><option value="recalled">Recalled</option></select>{canConfigure && <button className="subtle-button" onClick={() => { setError(''); setShowCategory(value => !value); }}><Boxes size={14}/> New category</button>}</div>
+    <div className="panel registry-table-panel"><div className="registry-table-heading"><div><h3>Product records</h3><p>Records visible to your active organization only</p></div><span className="registry-count">{pagination.total} total</span></div>
+      {loading ? <div className="registry-empty">Loading product records…</div> : products.length === 0 ? <div className="registry-empty"><PackageSearchFallback/><strong>No products found</strong><span>Register your first product or adjust the search filters.</span></div> : <div className="registry-table-wrap"><table className="registry-table"><thead><tr><th>Product identity</th><th>Category</th><th>Manufacturer</th><th>Status</th><th>Created</th><th/></tr></thead><tbody>{products.map(product => <tr key={product.identifier} onClick={() => setSelected(product)} className={selected?.identifier === product.identifier ? 'selected' : ''}><td><strong>{product.name}</strong><small>{product.identifier}{product.sku ? ' · SKU ' + product.sku : ''}</small></td><td>{categoryLabel(product)}</td><td>{product.manufacturer.name}<small>{product.manufacturer.countryCode || 'Country not set'}</small></td><td><span className={'product-status ' + product.status}>{product.status}</span></td><td>{new Date(product.createdAt).toLocaleDateString()}</td><td><ArrowRight size={15}/></td></tr>)}</tbody></table></div>}
+      <div className="registry-pagination"><span>Page {pagination.page} of {Math.max(1,pagination.pages)}</span><div><button className="subtle-button" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}><ArrowLeft size={13}/> Previous</button><button className="subtle-button" disabled={page >= pagination.pages || loading} onClick={() => setPage(value => value + 1)}>Next <ArrowRight size={13}/></button></div></div>
+    </div>
+    {selected && <aside className="product-detail panel"><div className="panel-heading"><div><span className="eyebrow">PRODUCT DETAILS</span><h3>{selected.name}</h3><p>{selected.identifier}</p></div><button className="close-button" onClick={() => setSelected(null)} aria-label="Close product details"><X size={17}/></button></div><p className="product-description">{selected.description || 'No description supplied.'}</p><div className="product-detail-grid"><div><small>Manufacturer</small><strong>{selected.manufacturer.name}</strong></div><div><small>Category</small><strong>{categoryLabel(selected)}</strong></div><div><small>SKU</small><strong>{selected.sku || 'Not assigned'}</strong></div><div><small>GTIN</small><strong>{selected.gtin || 'Not assigned'}</strong></div><div><small>Suppliers</small><strong>{selected.suppliers.length}</strong></div><div><small>Material entries</small><strong>{selected.materials.length}</strong></div></div>{selected.suppliers.length > 0 && <div className="product-detail-list"><strong>Supply chain parties</strong>{selected.suppliers.map((supplier, index) => <span key={index}>{supplier.name} · {supplier.role}{supplier.countryCode ? ' · ' + supplier.countryCode : ''}</span>)}</div>}{selected.materials.length > 0 && <div className="product-detail-list"><strong>Material composition</strong>{selected.materials.map((material, index) => <span key={index}>{material.name} ({material.materialType}) · {material.massGrams.toLocaleString()} g · {material.recycledContentPercent}% recycled{material.originCountry ? ' · ' + material.originCountry : ''}</span>)}</div>}{selected.customAttributes && Object.keys(selected.customAttributes).length > 0 && <div className="product-detail-list"><strong>Category attributes</strong>{Object.entries(selected.customAttributes).map(([key, value]) => <span key={key}>{key}: {String(value)}</span>)}</div>}<div className="product-detail-status"><label>Product status<select disabled={busy || selected.status === 'recalled'} value={selected.status} onChange={e => void changeStatus(selected, e.target.value as Product['status'])}><option value="draft">Draft</option><option value="active">Active</option><option value="discontinued">Discontinued</option><option value="recalled">Recalled</option></select></label><span>Transitions are validated by the API and recorded in the organization audit log.</span></div></aside>}
+    <div className="registry-footnote"><Factory size={14}/> Product identifiers and records are isolated by organization. Evidence files and public passport publishing are planned for later milestones.</div>
+  </div>;
+}
+
+function PackageSearchFallback() {
+  return <span className="registry-empty-icon"><Boxes size={24}/></span>;
+}
