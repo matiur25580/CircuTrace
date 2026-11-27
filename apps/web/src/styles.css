@@ -10,3 +10,5 @@
 @media(max-width:760px){.registry-heading{align-items:flex-start;flex-direction:column}.registry-actions{width:100%}.registry-stats{gap:7px}.registry-stats>div{padding:11px}.registry-stats strong{font-size:15px}.registry-toolbar{flex-wrap:wrap}.registry-search{flex-basis:100%}.registry-toolbar select{flex:1}.registry-form-grid{grid-template-columns:1fr}.registry-wide{grid-column:auto}.product-detail-grid{grid-template-columns:repeat(2,1fr)}.product-detail-status{align-items:stretch;flex-direction:column}.product-detail-status label{width:100%}}
 
 .nav-item{border:0;background:transparent;width:100%;text-align:left;cursor:pointer;font-family:inherit}.metadata-required{flex-direction:row!important;align-items:center}.metadata-required input{width:auto}
+
+.product-detail-list{display:flex;flex-direction:column;gap:6px;border-top:1px solid #eff2f4;padding:12px 0}.product-detail-list strong{font-size:9px;color:#536477}.product-detail-list span{font-size:9px;color:#7b8997;line-height:1.5}
