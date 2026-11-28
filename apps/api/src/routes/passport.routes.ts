@@ -9,10 +9,10 @@ export const passportRouter = Router();
 const publicRouter = Router({ mergeParams: true });
 
 publicRouter.get('/', async (request, response, next) => {
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Robots-Tag', 'noindex, nofollow');
   try {
     const data = await getPublicPassport(String(request.params.slug));
-    response.setHeader('Cache-Control', 'no-store');
-    response.setHeader('X-Robots-Tag', 'noindex, nofollow');
     response.json({ success: true, data });
   } catch (error) { next(error); }
 });
