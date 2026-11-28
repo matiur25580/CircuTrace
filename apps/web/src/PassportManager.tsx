@@ -23,6 +23,7 @@ export default function PassportManager({ role }: { role: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [editing, setEditing] = useState(false);
   const canPublish = role === 'owner' || role === 'admin';
   const publicUrl = passport?.publicSlug ? `${window.location.origin}/passport/${passport.publicSlug}` : '';
 
@@ -58,6 +59,7 @@ export default function PassportManager({ role }: { role: string }) {
       );
       setPassport(result.passport);
       setSections(result.passport.sections);
+      setEditing(false);
       setNotice(action === 'revoke' ? 'Public access has been revoked.' : action === 'publish' ? 'Passport published successfully.' : 'Public sections updated.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to update the public passport.'); }
     finally { setBusy(false); }
@@ -76,12 +78,11 @@ export default function PassportManager({ role }: { role: string }) {
       <label className="passport-product-select">Product identity<select value={identifier} disabled={loading || products.length === 0} onChange={event => setIdentifier(event.target.value)}><option value="">Select a product</option>{products.map(product => <option key={product.identifier} value={product.identifier}>{product.identifier} — {product.name} ({product.status})</option>)}</select></label>
       {loading ? <div className="registry-empty">Loading products…</div> : products.length === 0 ? <div className="registry-empty">Register a product before publishing a passport.</div> : identifier && <>
         <div className="passport-section-list"><div className="panel-heading"><div><h3>Public disclosure settings</h3><p>Only the selected sections are returned by the unauthenticated public endpoint.</p></div></div>
-          {sectionLabels.map(item => <label className="passport-section" key={item.key}><span><strong>{item.label}</strong><small>{item.detail}</small></span><input type="checkbox" checked={sections[item.key]} disabled={!canPublish || busy || passport?.status === 'published'} onChange={event => setSections(current => ({ ...current, [item.key]: event.target.checked }))}/></label>)}
+          {sectionLabels.map(item => <label className="passport-section" key={item.key}><span><strong>{item.label}</strong><small>{item.detail}</small></span><input type="checkbox" checked={sections[item.key]} disabled={!canPublish || busy || (passport?.status === 'published' && !editing)} onChange={event => setSections(current => ({ ...current, [item.key]: event.target.checked }))}/></label>)}
         </div>
         <div className="passport-actions">
           {!passport || passport.status === 'revoked' ? <button className="primary-button" disabled={!canPublish || busy || !Object.values(sections).some(Boolean)} onClick={() => void save('publish')}><Globe2 size={15}/> {busy ? 'Publishing…' : passport ? 'Republish passport' : 'Publish passport'}</button> : <>
-            <button className="subtle-button" disabled={!canPublish || busy} onClick={() => { setPassport(current => current ? { ...current, status: 'revoked' } : current); }}><ShieldCheck size={15}/> Edit public sections</button>
-            <button className="primary-button" disabled={!canPublish || busy} onClick={() => void save('update')}>Save section changes</button>
+            {!editing ? <button className="subtle-button" disabled={!canPublish || busy} onClick={() => setEditing(true)}><ShieldCheck size={15}/> Edit public sections</button> : <><button className="primary-button" disabled={!canPublish || busy || !Object.values(sections).some(Boolean)} onClick={() => void save('update')}>Save section changes</button><button className="subtle-button" disabled={busy} onClick={() => { setSections(passport.sections); setEditing(false); }}>Cancel</button></>}
             <button className="danger-button" disabled={!canPublish || busy} onClick={() => { if (window.confirm('Revoke this public passport link? Anyone using it will lose access immediately.')) void save('revoke'); }}><ShieldOff size={14}/> Revoke access</button>
           </>}
         </div>
