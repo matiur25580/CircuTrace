@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { LifecycleSequence } from '../models/lifecycle-sequence.model.js';
 import { Product } from '../models/product.model.js';
+import { AuditEvent } from '../models/audit-event.model.js';
 import { ProductLifecycleEvent } from '../models/product-lifecycle-event.model.js';
 
 type LifecycleType = 'manufactured' | 'quality_inspected' | 'packaged' | 'dispatched' | 'shipped' | 'received' | 'custody_transferred' | 'repaired' | 'refurbished' | 'recycled' | 'recalled';
@@ -41,8 +42,9 @@ export async function appendLifecycleEvent(identifier: string, input: EventInput
   validateLifecycleEvent(input);
   const sequence = await nextSequence(organizationId);
   const eventId = formatLifecycleEventId(organizationId.toString(), sequence);
+  let event;
   try {
-    return await ProductLifecycleEvent.create({
+    event = await ProductLifecycleEvent.create({
       ...input, organizationId, productId: product._id, productIdentifier: product.identifier,
       sequence, eventId, actorUserId, requestId,
     });
@@ -52,6 +54,15 @@ export async function appendLifecycleEvent(identifier: string, input: EventInput
     }
     throw error;
   }
+  if (input.type === 'recalled') {
+    await Product.updateOne({ _id: product._id, organizationId }, { $set: { status: 'recalled', updatedBy: actorUserId } });
+  }
+  await AuditEvent.create({
+    organizationId, actorUserId, action: 'product.lifecycle_event.appended',
+    targetType: 'product_lifecycle_event', targetId: event.id,
+    metadata: { eventId, productIdentifier: product.identifier, type: input.type, sequence }, requestId,
+  });
+  return event;
 }
 
 export async function listLifecycleEvents(identifier: string, query: { type?: LifecycleType; page: number; limit: number; order: 'asc' | 'desc' }, organizationId: mongoose.Types.ObjectId) {
