@@ -15,8 +15,8 @@ export async function publishPassport(identifier: string, sections: Sections, or
   if (product.status === 'draft') return fail('A draft product cannot be published. Activate the product first.', 409);
   const passport = await PublicPassport.findOneAndUpdate(
     { organizationId, productId: product._id },
-    { $set: { productIdentifier: product.identifier, status: 'published', sections, publishedAt: new Date(), revokedAt: null, updatedBy: actorUserId },
-      $setOnInsert: { organizationId, productId: product._id, publicSlug: randomBytes(24).toString('base64url'), createdBy: actorUserId } },
+    { $set: { productIdentifier: product.identifier, publicSlug: randomBytes(24).toString('base64url'), status: 'published', sections, publishedAt: new Date(), revokedAt: null, updatedBy: actorUserId },
+      $setOnInsert: { organizationId, productId: product._id, createdBy: actorUserId } },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
   );
   await AuditEvent.create({ organizationId, actorUserId, action: 'product.passport.published', targetType: 'public_passport', targetId: passport.id, metadata: { productIdentifier: product.identifier, sections }, requestId });
