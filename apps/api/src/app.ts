@@ -11,6 +11,7 @@ import { healthRouter } from './routes/health.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { organizationRouter } from './routes/organization.routes.js';
 import { productRouter } from './routes/product.routes.js';
+import { lifecycleRouter } from './routes/lifecycle.routes.js';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -44,5 +45,6 @@ app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/organizations', organizationRouter);
 app.use('/api/v1/products', productRouter);
+app.use('/api/v1/lifecycle', lifecycleRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
