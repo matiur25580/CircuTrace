@@ -25,7 +25,7 @@ export default function PassportManager({ role }: { role: string }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(false);
-  const canPublish = role !== 'auditor';
+  const canPublish = ['owner', 'admin', 'member'].includes(role);
   const publicUrl = passport?.publicSlug ? `${window.location.origin}/passport/${passport.publicSlug}` : '';
   const selectedProduct = products.find(product => product.identifier === identifier);
 
