@@ -45,6 +45,10 @@ describe('public passport service security boundaries', () => {
     expect(update.$set.publicSlug).toMatch(/^[A-Za-z0-9_-]{32}$/);
     expect(update.$setOnInsert.publicSlug).toBeUndefined();
     expect(update.$set.status).toBe('published');
+    const firstSlug = update.$set.publicSlug;
+    await publishPassport('CT-ORG-000001', sections, orgId, actorId, 'request-2');
+    const secondSlug = mocks.passportFindOneAndUpdate.mock.calls[1][1].$set.publicSlug;
+    expect(secondSlug).not.toBe(firstSlug);
     expect(mocks.auditCreate).toHaveBeenCalledWith(expect.objectContaining({
       organizationId: orgId,
       actorUserId: actorId,
@@ -96,6 +100,28 @@ describe('public passport service security boundaries', () => {
     expect(result).not.toHaveProperty('suppliers');
     expect(result).not.toHaveProperty('customAttributes');
     expect(select).toHaveBeenCalledWith('identifier name description status categoryId manufacturer materials createdAt updatedAt');
+  });
+
+  it('bounds lifecycle disclosure to 200 events and scopes it to the passport tenant and product', async () => {
+    mocks.passportFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue({
+      organizationId: orgId, productId, status: 'published', publishedAt: new Date(), updatedAt: new Date(),
+      sections: { identity: false, manufacturer: false, materials: false, lifecycle: true },
+    }) });
+    const eventList = [{ eventId: 'event-1', type: 'manufactured' }];
+    const limit = vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(eventList) });
+    const sort = vi.fn().mockReturnValue({ limit });
+    const select = vi.fn().mockReturnValue({ sort });
+    mocks.lifecycleFind.mockReturnValue({ select });
+    const productLean = vi.fn().mockResolvedValue({ status: 'active' });
+    const populate = vi.fn().mockReturnValue({ lean: productLean });
+    mocks.productFindOne.mockReturnValue({ select: vi.fn().mockReturnValue({ populate }) });
+
+    const result = await getPublicPassport('lifecycle-slug');
+
+    expect(mocks.lifecycleFind).toHaveBeenCalledWith({ organizationId: orgId, productId });
+    expect(limit).toHaveBeenCalledWith(200);
+    expect(result.lifecycle).toEqual(eventList);
+    expect(result).not.toHaveProperty('identity');
   });
 
   it('does not resolve a product when the public slug is revoked or unknown', async () => {
