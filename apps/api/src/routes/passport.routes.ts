@@ -6,7 +6,7 @@ import { publishPassportSchema, updatePassportSchema } from '../schemas/passport
 import { getPassportManagement, getPublicPassport, publishPassport, revokePassport, updatePassport } from '../services/passport.service.js';
 
 export const passportRouter = Router();
-const publicRouter = Router();
+const publicRouter = Router({ mergeParams: true });
 
 publicRouter.get('/', async (request, response, next) => {
   try {
