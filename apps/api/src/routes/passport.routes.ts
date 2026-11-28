@@ -8,7 +8,7 @@ import { getPassportManagement, getPublicPassport, publishPassport, revokePasspo
 export const passportRouter = Router();
 const publicRouter = Router();
 
-publicRouter.get('/:slug', async (request, response, next) => {
+publicRouter.get('/', async (request, response, next) => {
   try {
     const data = await getPublicPassport(String(request.params.slug));
     response.setHeader('Cache-Control', 'no-store');
