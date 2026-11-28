@@ -27,6 +27,7 @@ export default function PassportManager({ role }: { role: string }) {
   const [editing, setEditing] = useState(false);
   const canPublish = role === 'owner' || role === 'admin';
   const publicUrl = passport?.publicSlug ? `${window.location.origin}/passport/${passport.publicSlug}` : '';
+  const selectedProduct = products.find(product => product.identifier === identifier);
 
   const loadProducts = useCallback(async () => {
     setLoading(true); setError('');
@@ -78,11 +79,12 @@ export default function PassportManager({ role }: { role: string }) {
     <div className="panel passport-config">
       <label className="passport-product-select">Product identity<select value={identifier} disabled={loading || products.length === 0} onChange={event => setIdentifier(event.target.value)}><option value="">Select a product</option>{products.map(product => <option key={product.identifier} value={product.identifier}>{product.identifier} — {product.name} ({product.status})</option>)}</select></label>
       {loading ? <div className="registry-empty">Loading products…</div> : products.length === 0 ? <div className="registry-empty">Register a product before publishing a passport.</div> : identifier && <>
+        {selectedProduct?.status === 'draft' && <p className="passport-revoked">Activate this product in the Product Registry before publishing its public passport.</p>}
         <div className="passport-section-list"><div className="panel-heading"><div><h3>Public disclosure settings</h3><p>Only the selected sections are returned by the unauthenticated public endpoint.</p></div></div>
           {sectionLabels.map(item => <label className="passport-section" key={item.key}><span><strong>{item.label}</strong><small>{item.detail}</small></span><input type="checkbox" checked={sections[item.key]} disabled={!canPublish || busy || (passport?.status === 'published' && !editing)} onChange={event => setSections(current => ({ ...current, [item.key]: event.target.checked }))}/></label>)}
         </div>
         <div className="passport-actions">
-          {!passport || passport.status === 'revoked' ? <button className="primary-button" disabled={!canPublish || busy || !Object.values(sections).some(Boolean)} onClick={() => void save('publish')}><Globe2 size={15}/> {busy ? 'Publishing…' : passport ? 'Republish passport' : 'Publish passport'}</button> : <>
+          {!passport || passport.status === 'revoked' ? <button className="primary-button" disabled={!canPublish || busy || selectedProduct?.status === 'draft' || !Object.values(sections).some(Boolean)} onClick={() => void save('publish')}><Globe2 size={15}/> {busy ? 'Publishing…' : passport ? 'Republish passport' : 'Publish passport'}</button> : <>
             {!editing ? <button className="subtle-button" disabled={!canPublish || busy} onClick={() => setEditing(true)}><ShieldCheck size={15}/> Edit public sections</button> : <><button className="primary-button" disabled={!canPublish || busy || !Object.values(sections).some(Boolean)} onClick={() => void save('update')}>Save section changes</button><button className="subtle-button" disabled={busy} onClick={() => { setSections(passport.sections); setEditing(false); }}>Cancel</button></>}
             <button className="danger-button" disabled={!canPublish || busy} onClick={() => { if (window.confirm('Revoke this public passport link? Anyone using it will lose access immediately.')) void save('revoke'); }}><ShieldOff size={14}/> Revoke access</button>
           </>}
