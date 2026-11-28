@@ -4,7 +4,7 @@ const publicPassportSchema = new Schema({
   organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, immutable: true },
   productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true, immutable: true },
   productIdentifier: { type: String, required: true, immutable: true, uppercase: true },
-  publicSlug: { type: String, required: true, unique: true, immutable: true, index: true },
+  publicSlug: { type: String, required: true, unique: true, index: true },
   status: { type: String, enum: ['published', 'revoked'], required: true, default: 'published' },
   sections: {
     identity: { type: Boolean, default: true },
