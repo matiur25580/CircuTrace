@@ -17,7 +17,7 @@ The allowed sections are identity, manufacturer, materials and lifecycle. At lea
 
 - `GET /api/v1/passports/public/:slug` — read an active passport without authentication.
 
-The opaque 192-bit random slug is the public capability URL and should be treated as shareable access. Revocation immediately removes the public response. Responses use `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`. Lifecycle output is bounded to the first 200 events.
+The opaque 192-bit random slug is the public capability URL and should be treated as shareable access. Revocation immediately removes the public response. A new random slug is issued on every publication, including republishing after revocation, so previously distributed QR codes do not become valid again. Responses use `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`. Lifecycle output is bounded to the first 200 events.
 
 ## Trust and privacy boundaries
 
