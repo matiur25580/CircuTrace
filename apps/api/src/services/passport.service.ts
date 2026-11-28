@@ -51,7 +51,7 @@ export async function getPublicPassport(publicSlug: string) {
   const passport = await PublicPassport.findOne({ publicSlug, status: 'published' }).lean();
   if (!passport) return fail('Public passport was not found.', 404);
   const product = await Product.findOne({ _id: passport.productId, organizationId: passport.organizationId })
-    .select('identifier name description status manufacturer materials createdAt updatedAt')
+    .select('identifier name description status categoryId manufacturer materials createdAt updatedAt')
     .populate('categoryId', 'name').lean();
   if (!product) return fail('Public passport was not found.', 404);
   const data: Record<string, unknown> = {
