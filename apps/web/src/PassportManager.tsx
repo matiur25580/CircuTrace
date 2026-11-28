@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { apiRequest } from './lib/api';
+import './passport.css';
 import { Copy, ExternalLink, Globe2, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react';
 
 type Product = { identifier: string; name: string; status: string };
